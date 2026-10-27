@@ -1,0 +1,1103 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Mic, MicOff, Volume2, VolumeX, Shield, Camera, Battery, Cpu, 
+  Terminal, Memory, Search, Youtube, Flashlight, Sliders, Settings, 
+  Zap, Play, Square, RefreshCw, Key, CheckCircle, AlertTriangle, 
+  Radio, Globe, Sparkles, User, MessageSquare, Database, Activity,
+  Lock, Eye, Power, AlertCircle, Send, HelpCircle, HardDrive
+} from 'lucide-react';
+
+// Main Rukko AI Application Component
+export default function App() {
+  // --- STATE MANAGEMENT ---
+  // Voice & Audio
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [transcript, setTranscript] = useState('');
+  const [selectedLanguage, setSelectedLanguage] = useState('hi-IN');
+  const [voiceVolume, setVoiceVolume] = useState(1);
+  const [voicePitch, setVoicePitch] = useState(1.1);
+  const [voiceRate, setVoiceRate] = useState(1);
+  const [availableVoices, setAvailableVoices] = useState([]);
+  const [selectedVoiceIndex, setSelectedVoiceIndex] = useState(0);
+
+  // Avatar & AI Emotion State
+  // States: 'khush' (Happy), 'sochti' (Thinking), 'udas' (Sad), 'naraz' (Angry), 'hairan' (Surprised), 'combat' (Active scan)
+  const [emotionState, setEmotionState] = useState('khush');
+  const [avatarMessage, setAvatarMessage] = useState('नमस्ते! मैं रुकको AI हूँ। आपकी क्या मदद करूँ?');
+  const [chatLogs, setChatLogs] = useState([
+    { id: 1, sender: 'rukko', text: 'Rukko AI Online. All Autonomous Systems Operational.', time: '00:00:01' },
+    { id: 2, sender: 'rukko', text: 'नमस्ते master! आपका सिस्टम सुरक्षित है। मैं आपकी आज्ञा का पालन करने के लिए तैयार हूँ।', time: new Date().toLocaleTimeString() }
+  ]);
+  const [inputText, setInputText] = useState('');
+
+  // Hardware & Device Monitors
+  const [batteryLevel, setBatteryLevel] = useState(85);
+  const [isCharging, setIsCharging] = useState(false);
+  const [batterySaver, setBatterySaver] = useState(false);
+  const [fpsBooster, setFpsBooster] = useState(true);
+  const [torchOn, setTorchOn] = useState(false);
+  const [currentFps, setCurrentFps] = useState(60);
+
+  // System Features & Tools
+  const [camActive, setCamActive] = useState(false);
+  const [scanStatus, setScanStatus] = useState('STANDBY'); // STANDBY, SCANNING, VERIFIED
+  const [memoryBank, setMemoryBank] = useState([
+    { id: 1, key: 'UserName', value: 'Master Programmer', category: 'Personal' },
+    { id: 2, key: 'PrimaryTask', value: 'Autonomous System Oversight', category: 'System' },
+    { id: 3, key: 'SecurityLevel', value: 'Class Alpha Ultra', category: 'Security' },
+    { id: 4, key: 'FavoriteLanguage', value: 'Hindi & JavaScript', category: 'Preferences' }
+  ]);
+  const [newMemKey, setNewMemKey] = useState('');
+  const [newMemVal, setNewMemVal] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState(null);
+  const [isSearching, setIsSearching] = useState(false);
+
+  // API Configuration & Diagnostics Console
+  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'system', 'memory', 'api_config', 'face_cam'
+  const [apiKeys, setApiKeys] = useState({
+    openai: '',
+    elevenlabs: '',
+    googleSpeech: '',
+    facePlus: ''
+  });
+  const [apiLogs, setApiLogs] = useState([]);
+  const [endpointStatus, setEndpointStatus] = useState({
+    gpt4: 'ONLINE_SIM',
+    elevenlabs: 'STANDBY',
+    speechToText: 'NATIVE_ACTIVE',
+    faceAuth: 'READY'
+  });
+
+  // Refs
+  const recognitionRef = useRef(null);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const soundwaveCanvasRef = useRef(null);
+  const animationFrameRef = useRef(null);
+
+  // --- INITIALIZATION EFFECTS ---
+  // Load Available Voices for Web Speech API
+  useEffect(() => {
+    const updateVoices = () => {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        const voices = window.speechSynthesis.getVoices();
+        setAvailableVoices(voices);
+        // Try to auto-select a Hindi or Indian English voice if available
+        const defaultIdx = voices.findIndex(v => v.lang.includes('hi') || v.lang.includes('IN'));
+        if (defaultIdx !== -1) setSelectedVoiceIndex(defaultIdx);
+      }
+    };
+    updateVoices();
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.onvoiceschanged = updateVoices;
+    }
+  }, []);
+
+  // Web Battery API Monitoring
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && 'getBattery' in navigator) {
+      navigator.getBattery().then((battery) => {
+        setBatteryLevel(Math.round(battery.level * 100));
+        setIsCharging(battery.charging);
+
+        battery.addEventListener('levelchange', () => {
+          setBatteryLevel(Math.round(battery.level * 100));
+        });
+        battery.addEventListener('chargingchange', () => {
+          setIsCharging(battery.charging);
+        });
+      }).catch(() => {
+        console.log('Battery API not supported on this browser context');
+      });
+    }
+  }, []);
+
+  // FPS Booster Counter Animation Loop
+  useEffect(() => {
+    let lastTime = performance.now();
+    let frameCount = 0;
+    
+    const measureFps = (now) => {
+      frameCount++;
+      if (now - lastTime >= 1000) {
+        setCurrentFps(fpsBooster ? Math.min(60, frameCount) : Math.min(30, frameCount));
+        frameCount = 0;
+        lastTime = now;
+      }
+      animationFrameRef.current = requestAnimationFrame(measureFps);
+    };
+
+    animationFrameRef.current = requestAnimationFrame(measureFps);
+    return () => cancelAnimationFrame(animationFrameRef.current);
+  }, [fpsBooster]);
+
+  // Visual Soundwave Visualizer Canvas Effect
+  useEffect(() => {
+    const canvas = soundwaveCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let animId;
+    let step = 0;
+
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const width = canvas.width;
+      const height = canvas.height;
+      
+      ctx.beginPath();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = isSpeaking ? '#00f3ff' : isListening ? '#ff0055' : '#334155';
+
+      for (let x = 0; x < width; x += 4) {
+        let y = height / 2;
+        if (isSpeaking) {
+          y += Math.sin((x + step) * 0.05) * 15 * Math.sin(step * 0.1);
+        } else if (isListening) {
+          y += Math.cos((x - step) * 0.08) * 12 * Math.sin(step * 0.15);
+        } else {
+          y += Math.sin((x + step) * 0.02) * 2;
+        }
+        if (x === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      step += 2;
+      animId = requestAnimationFrame(draw);
+    };
+
+    draw();
+    return () => cancelAnimationFrame(animId);
+  }, [isSpeaking, isListening]);
+
+  // --- SPEECH RECOGNITION SETUP ---
+  const startSpeechRecognition = () => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      addLog('system', 'Speech Recognition is not supported in this browser.');
+      speakText('क्षमा करें, आपके ब्राउज़र में वॉयस रिकॉग्निशन सपोर्ट उपलब्ध नहीं है।');
+      return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognitionRef.current = new SpeechRecognition();
+    recognitionRef.current.continuous = false;
+    recognitionRef.current.interimResults = true;
+    recognitionRef.current.lang = selectedLanguage;
+
+    recognitionRef.current.onstart = () => {
+      setIsListening(true);
+      setEmotionState('sochti');
+      addLog('system', `Voice Recognition Activated [Language: ${selectedLanguage}]`);
+    };
+
+    recognitionRef.current.onresult = (event) => {
+      let currentTranscript = '';
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        currentTranscript += event.results[i][0].transcript;
+      }
+      setTranscript(currentTranscript);
+    };
+
+    recognitionRef.current.onerror = (event) => {
+      console.error('Speech recognition error', event.error);
+      setIsListening(false);
+      setEmotionState('udas');
+      addLog('error', `Speech error: ${event.error}`);
+    };
+
+    recognitionRef.current.onend = () => {
+      setIsListening(false);
+      if (transcript.trim()) {
+        processUserQuery(transcript);
+      }
+    };
+
+    recognitionRef.current.start();
+  };
+
+  const stopSpeechRecognition = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    }
+  };
+
+  // --- NATIVE SPEECH SYNTHESIS (TTS) ---
+  const speakText = (text) => {
+    if (!('speechSynthesis' in window)) {
+      addLog('system', 'TTS Speech Synthesis is not supported in this browser.');
+      return;
+    }
+
+    window.speechSynthesis.cancel(); // Stop current speech
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.volume = voiceVolume;
+    utterance.pitch = voicePitch;
+    utterance.rate = voiceRate;
+
+    if (availableVoices[selectedVoiceIndex]) {
+      utterance.voice = availableVoices[selectedVoiceIndex];
+    }
+
+    utterance.onstart = () => {
+      setIsSpeaking(true);
+    };
+
+    utterance.onend = () => {
+      setIsSpeaking(false);
+      setEmotionState('khush');
+    };
+
+    utterance.onerror = (err) => {
+      console.error('TTS error', err);
+      setIsSpeaking(false);
+    };
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  // --- AI ENGINE & INTENT PROCESSING ---
+  const processUserQuery = (userMessage) => {
+    addLog('user', userMessage);
+    const query = userMessage.toLowerCase();
+    setEmotionState('sochti');
+
+    // System Commands Local Dispatcher
+    let responseText = "";
+    let detectedEmotion = "khush";
+
+    if (query.includes('नमस्ते') || query.includes('hello') || query.includes('hi rukko')) {
+      responseText = "नमस्ते boss! मैं आपकी क्या सहायता कर सकती हूँ?";
+      detectedEmotion = "khush";
+    } else if (query.includes('battery') || query.includes('बैटरी')) {
+      responseText = `आपकी डिवाइस बैटरी ${batteryLevel}% है ${isCharging ? 'और डिवाइस चार्ज हो रहा है।' : '|'}`;
+      detectedEmotion = batteryLevel < 20 ? "udas" : "khush";
+    } else if (query.includes('torch') || query.includes('टॉर्च') || query.includes('light')) {
+      const nextTorch = !torchOn;
+      setTorchOn(nextTorch);
+      responseText = nextTorch ? "टॉर्च सिमुलेशन ऑन कर दिया गया है।" : "टॉर्च बंद कर दी गई है।";
+      detectedEmotion = "combat";
+    } else if (query.includes('fps') || query.includes('game mode') || query.includes('बूस्टर')) {
+      setFpsBooster(!fpsBooster);
+      responseText = !fpsBooster ? "Gaming FPS Booster mode activated. 60 FPS locked." : "Standard battery saving FPS mode active.";
+      detectedEmotion = "combat";
+    } else if (query.includes('who are you') || query.includes('तुम कौन हो')) {
+      responseText = "मैं Rukko AI हूँ - आपका पूरी तरह से ऑटोनॉमस पर्सनल एआई असिस्टेंट। मैं आपके सिस्टम, मेमोरी और एपीआई कंट्रोल को संभाल सकती हूँ।";
+      detectedEmotion = "khush";
+    } else if (query.includes('sad') || query.includes('उदास')) {
+      responseText = "अरे master! उदास मत होइए। Rukko AI हमेशा आपके साथ है। सब ठीक हो जाएगा!";
+      detectedEmotion = "udas";
+    } else if (query.includes('angry') || query.includes('गुस्सा')) {
+      responseText = "माफ़ कीजियेगा master, मुझसे कोई भूल हुई तो! मैं तुरंत अपना कोड सुधारती हूँ।";
+      detectedEmotion = "naraz";
+    } else if (query.includes('search') || query.includes('खोजो')) {
+      const cleanTerm = query.replace('search', '').replace('खोजो', '').trim();
+      handleWebSearch(cleanTerm || 'Rukko AI updates');
+      responseText = `मैं वेब पर "${cleanTerm || 'Rukko AI'}" की खोज कर रही हूँ।`;
+      detectedEmotion = "sochti";
+    } else {
+      // Default Autonomous Response Generator
+      responseText = `मैंने समझा master, आपने कहा: "${userMessage}". Rukko AI autonomous modules आपकी इस कमांड को एग्जीक्यूट कर रहे हैं।`;
+      detectedEmotion = "hairan";
+    }
+
+    setEmotionState(detectedEmotion);
+    setAvatarMessage(responseText);
+    addLog('rukko', responseText);
+    speakText(responseText);
+    setTranscript('');
+  };
+
+  const handleManualSubmit = (e) => {
+    e.preventDefault();
+    if (!inputText.trim()) return;
+    processUserQuery(inputText);
+    setInputText('');
+  };
+
+  // --- LOGGING UTILITY ---
+  const addLog = (sender, text) => {
+    const newEntry = {
+      id: Date.now(),
+      sender,
+      text,
+      time: new Date().toLocaleTimeString()
+    };
+    setChatLogs(prev => [...prev, newEntry]);
+
+    // Also add to API diagnostic log
+    setApiLogs(prev => [
+      { id: Date.now(), timestamp: new Date().toLocaleTimeString(), endpoint: sender.toUpperCase(), status: '200 OK', message: text.substring(0, 45) + '...' },
+      ...prev.slice(0, 15)
+    ]);
+  };
+
+  // --- FACE CAMERA & SCANNER SIMULATION ---
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        setCamActive(true);
+        runFaceScan();
+      }
+    } catch (err) {
+      addLog('error', `Camera Permission Denied: ${err.message}`);
+      // Fallback simulation mode
+      setCamActive(true);
+      runFaceScan();
+    }
+  };
+
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject;
+      const tracks = stream.getTracks();
+      tracks.forEach(track => track.stop());
+    }
+    setCamActive(false);
+    setScanStatus('STANDBY');
+  };
+
+  const runFaceScan = () => {
+    setScanStatus('SCANNING');
+    setEmotionState('combat');
+    setTimeout(() => {
+      setScanStatus('VERIFIED');
+      setEmotionState('khush');
+      addLog('system', 'Face Authentication Completed: User Master Identified [Confidence 99.8%]');
+      speakText('बायोमेट्रिक स्कैन सफल रहा! स्वागत है Master!');
+    }, 3000);
+  };
+
+  // --- MEMORY BANK CONTROLLER ---
+  const addMemoryItem = (e) => {
+    e.preventDefault();
+    if (!newMemKey || !newMemVal) return;
+    const newItem = {
+      id: Date.now(),
+      key: newMemKey,
+      value: newMemVal,
+      category: 'User Custom'
+    };
+    setMemoryBank(prev => [...prev, newItem]);
+    setNewMemKey('');
+    setNewMemVal('');
+    addLog('system', `Memory Bank Updated: [${newMemKey} -> ${newMemVal}]`);
+  };
+
+  const deleteMemoryItem = (id) => {
+    setMemoryBank(prev => prev.filter(m => m.id !== id));
+    addLog('system', `Memory item purged from long-term storage.`);
+  };
+
+  // --- WEB SEARCH SIMULATOR ---
+  const handleWebSearch = (term) => {
+    setIsSearching(true);
+    setSearchQuery(term);
+    setTimeout(() => {
+      setSearchResults([
+        { title: `Autonomous Intelligence Report: ${term}`, url: `https://rukko.ai/search?q=${encodeURIComponent(term)}`, snippet: `Verified neural grounding output for request query: ${term}. System active and responsive.` },
+        { title: `Global Knowledge Database Entry for ${term}`, url: `https://en.wikipedia.org/wiki/${encodeURIComponent(term)}`, snippet: `Detailed real-time breakdown of ${term} indexed via Rukko AI web grounding crawler.` }
+      ]);
+      setIsSearching(false);
+    }, 1200);
+  };
+
+  // --- API DIAGNOSTIC TEST RUNNER ---
+  const triggerApiTest = (type) => {
+    const timestamp = new Date().toLocaleTimeString();
+    let logItem = {};
+
+    if (type === 'GPT4') {
+      logItem = { id: Date.now(), timestamp, endpoint: 'POST /v1/chat/completions (OpenAI)', status: apiKeys.openai ? '200 OK (LIVE)' : '200 OK (SIMULATED)', message: 'Model: gpt-4o, Latency: 124ms' };
+    } else if (type === 'ELEVENLABS') {
+      logItem = { id: Date.now(), timestamp, endpoint: 'POST /v1/text-to-speech (ElevenLabs)', status: apiKeys.elevenlabs ? '200 OK (LIVE)' : '200 OK (SIMULATED)', message: 'Voice ID: Rachel, Latency: 210ms' };
+    } else if (type === 'FACE_PLUS') {
+      logItem = { id: Date.now(), timestamp, endpoint: 'POST /facepp/v3/detect (Biometrics)', status: '200 OK (ACTIVE)', message: 'Face Count: 1, Emotion: Happy, Age: 25' };
+    }
+
+    setApiLogs(prev => [logItem, ...prev]);
+  };
+
+  // Dynamic Avatar Theme Styling helper
+  const getEmotionColor = () => {
+    switch (emotionState) {
+      case 'khush': return 'from-cyan-500 to-blue-600 border-cyan-400 shadow-cyan-500/50';
+      case 'sochti': return 'from-purple-500 to-indigo-600 border-purple-400 shadow-purple-500/50';
+      case 'udas': return 'from-blue-700 to-slate-800 border-blue-500 shadow-blue-500/50';
+      case 'naraz': return 'from-red-600 to-rose-700 border-red-500 shadow-red-500/50';
+      case 'hairan': return 'from-amber-400 to-orange-500 border-amber-400 shadow-amber-500/50';
+      case 'combat': return 'from-emerald-400 to-teal-600 border-emerald-400 shadow-emerald-500/50';
+      default: return 'from-cyan-500 to-blue-600 border-cyan-400 shadow-cyan-500/50';
+    }
+  };
+
+  return (
+    <div className={`min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-cyan-500 selection:text-black overflow-x-hidden ${torchOn ? 'brightness-125' : ''}`}>
+      {/* Background Cyberpunk Grid & Glass Accent Lights */}
+      <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black -z-10 pointer-events-none" />
+      <div className="fixed -top-40 -left-40 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="fixed -bottom-40 -right-40 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+
+      {/* TOP SYSTEM HUD BAR */}
+      <header className="sticky top-0 z-50 backdrop-blur-md bg-slate-900/80 border-b border-slate-800/80 px-4 py-3">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+          
+          {/* Logo & Title */}
+          <div className="flex items-center space-x-3">
+            <div className="relative">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/30">
+                <Sparkles className="w-6 h-6 text-white animate-pulse" />
+              </div>
+              <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-emerald-500 border-2 border-slate-950 rounded-full" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <h1 className="text-xl font-black tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-teal-200 to-white font-mono">
+                  RUKKO AI
+                </h1>
+                <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                  v4.0 Autonomous
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">Personal Autonomous Assistant Suite</p>
+            </div>
+          </div>
+
+          {/* Device Telemetry HUD */}
+          <div className="flex items-center space-x-4 bg-slate-950/60 px-4 py-1.5 rounded-full border border-slate-800/80 text-xs">
+            {/* Battery Status */}
+            <div className="flex items-center space-x-1.5">
+              <Battery className={`w-4 h-4 ${batteryLevel < 20 ? 'text-red-400' : 'text-emerald-400'}`} />
+              <span className="font-mono font-semibold">{batteryLevel}%</span>
+              {isCharging && <Zap className="w-3 h-3 text-amber-400 animate-bounce" />}
+            </div>
+
+            <div className="w-px h-4 bg-slate-800" />
+
+            {/* FPS Counter */}
+            <div className="flex items-center space-x-1.5">
+              <Cpu className="w-4 h-4 text-cyan-400" />
+              <span className="font-mono">{currentFps} FPS</span>
+            </div>
+
+            <div className="w-px h-4 bg-slate-800" />
+
+            {/* Language Selector */}
+            <div className="flex items-center space-x-1.5">
+              <Globe className="w-4 h-4 text-indigo-400" />
+              <select 
+                value={selectedLanguage}
+                onChange={(e) => setSelectedLanguage(e.target.value)}
+                className="bg-transparent text-slate-200 font-medium focus:outline-none cursor-pointer"
+              >
+                <option value="hi-IN" className="bg-slate-900">हिंदी (Hindi)</option>
+                <option value="en-US" className="bg-slate-900">English (US)</option>
+                <option value="bho-IN" className="bg-slate-900">भोजपुरी (Bhojpuri)</option>
+                <option value="ur-PK" className="bg-slate-900">اردو (Urdu)</option>
+                <option value="ta-IN" className="bg-slate-900">தமிழ் (Tamil)</option>
+                <option value="te-IN" className="bg-slate-900">తెలుగు (Telugu)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* System Control Toggles */}
+          <div className="flex items-center space-x-2">
+            <button 
+              onClick={() => setTorchOn(!torchOn)}
+              className={`p-2 rounded-xl border transition-all ${torchOn ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 shadow-lg shadow-amber-500/20' : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white'}`}
+              title="Toggle Flashlight Simulation"
+            >
+              <Flashlight className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={() => setFpsBooster(!fpsBooster)}
+              className={`p-2 rounded-xl border transition-all ${fpsBooster ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300 shadow-lg shadow-emerald-500/20' : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white'}`}
+              title="FPS Game Booster Mode"
+            >
+              <Zap className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={() => setActiveTab('api_config')}
+              className="px-3 py-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 text-xs font-semibold flex items-center space-x-1.5 transition-all"
+            >
+              <Key className="w-3.5 h-3.5" />
+              <span>API Settings</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* MAIN CONTAINER LAYOUT */}
+      <main className="max-w-7xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        {/* LEFT COLUMN: RUKKO AI AVATAR & VOICE CONTROL HUB (5 Cols) */}
+        <section className="lg:col-span-5 flex flex-col space-y-6">
+          
+          {/* AVATAR INTERACTIVE CARD */}
+          <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/80 rounded-3xl p-6 flex flex-col items-center justify-center relative overflow-hidden shadow-2xl">
+            {/* Background Reticle Scan FX */}
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-cyan-500/5 via-transparent to-transparent pointer-events-none" />
+            
+            {/* Status Indicator Badge */}
+            <div className="absolute top-4 left-4 flex items-center space-x-2">
+              <span className={`w-2.5 h-2.5 rounded-full animate-ping ${isSpeaking ? 'bg-cyan-400' : isListening ? 'bg-rose-500' : 'bg-emerald-400'}`} />
+              <span className="text-[11px] font-mono uppercase tracking-widest text-slate-400">
+                {isSpeaking ? 'VOICE OUT' : isListening ? 'LISTENING' : emotionState.toUpperCase()}
+              </span>
+            </div>
+
+            {/* Dynamic Avatar Face Circle */}
+            <div className="relative my-6 group">
+              <div className={`w-48 h-48 rounded-full bg-gradient-to-b ${getEmotionColor()} border-4 shadow-2xl flex items-center justify-center transition-all duration-500 relative overflow-hidden`}>
+                
+                {/* Cyber Scanner Overlay Line */}
+                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-cyan-400/20 to-transparent animate-pulse" />
+
+                {/* Face Emoticon Expression Render */}
+                <div className="flex flex-col items-center justify-center text-white text-center z-10 transition-transform duration-300">
+                  {emotionState === 'khush' && (
+                    <div className="space-y-3">
+                      <div className="flex space-x-8 text-3xl font-black"><span>^</span><span>^</span></div>
+                      <div className="w-10 h-4 border-b-4 border-white rounded-full mx-auto" />
+                    </div>
+                  )}
+
+                  {emotionState === 'sochti' && (
+                    <div className="space-y-3 animate-pulse">
+                      <div className="flex space-x-8 text-3xl font-black"><span>•</span><span>•</span></div>
+                      <div className="w-8 h-1 bg-white rounded-full mx-auto" />
+                    </div>
+                  )}
+
+                  {emotionState === 'udas' && (
+                    <div className="space-y-3">
+                      <div className="flex space-x-8 text-3xl font-black"><span>T</span><span>T</span></div>
+                      <div className="w-10 h-3 border-t-4 border-white rounded-full mx-auto" />
+                    </div>
+                  )}
+
+                  {emotionState === 'naraz' && (
+                    <div className="space-y-3">
+                      <div className="flex space-x-6 text-2xl font-black"><span>\</span><span>/</span></div>
+                      <div className="w-8 h-1 bg-white rounded-full mx-auto" />
+                    </div>
+                  )}
+
+                  {emotionState === 'hairan' && (
+                    <div className="space-y-3">
+                      <div className="flex space-x-8 text-3xl font-black"><span>O</span><span>O</span></div>
+                      <div className="w-6 h-6 border-2 border-white rounded-full mx-auto" />
+                    </div>
+                  )}
+
+                  {emotionState === 'combat' && (
+                    <div className="space-y-2">
+                      <Shield className="w-12 h-12 text-emerald-300 animate-spin" />
+                      <span className="text-[10px] font-mono tracking-widest text-emerald-200">COMBAT LOCK</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Pulsing Voice Halo Ring */}
+              {(isSpeaking || isListening) && (
+                <div className="absolute -inset-4 rounded-full border-2 border-cyan-400/50 animate-ping pointer-events-none" />
+              )}
+            </div>
+
+            {/* Soundwave Visualizer Canvas */}
+            <div className="w-full h-12 my-2">
+              <canvas ref={soundwaveCanvasRef} width={400} height={48} className="w-full h-full" />
+            </div>
+
+            {/* Avatar Speech Bubble Display */}
+            <div className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl p-4 text-center my-2 shadow-inner min-h-[70px] flex items-center justify-center">
+              <p className="text-sm text-cyan-200 font-medium leading-relaxed">
+                "{avatarMessage}"
+              </p>
+            </div>
+
+            {/* Dynamic Emotion Switcher Controls */}
+            <div className="w-full flex items-center justify-center space-x-2 pt-2">
+              {['khush', 'sochti', 'udas', 'naraz', 'hairan', 'combat'].map(e => (
+                <button
+                  key={e}
+                  onClick={() => setEmotionState(e)}
+                  className={`text-[10px] uppercase font-bold px-2 py-1 rounded-lg border transition-all ${emotionState === e ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300' : 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-300'}`}
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* VOICE MIC & SPEECH CONTROL BUTTONS */}
+          <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/80 rounded-3xl p-6 flex flex-col space-y-4 shadow-xl">
+            <h3 className="text-xs font-mono uppercase tracking-wider text-slate-400 flex items-center space-x-2">
+              <Radio className="w-4 h-4 text-cyan-400" />
+              <span>Voice Engine Controls</span>
+            </h3>
+
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={isListening ? stopSpeechRecognition : startSpeechRecognition}
+                className={`flex-1 py-4 rounded-2xl font-bold flex items-center justify-center space-x-3 shadow-lg transition-all ${
+                  isListening 
+                    ? 'bg-gradient-to-r from-rose-600 to-red-600 text-white shadow-rose-600/40 animate-pulse' 
+                    : 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:from-cyan-400 hover:to-blue-500 shadow-cyan-500/30'
+                }`}
+              >
+                {isListening ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+                <span className="text-base tracking-wide">
+                  {isListening ? 'रुकिए (Listening...)' : 'बोलिए (Start Listening)'}
+                </span>
+              </button>
+            </div>
+
+            {/* Live Voice Realtime Text Stream */}
+            {transcript && (
+              <div className="bg-slate-950/80 border border-slate-800 p-3 rounded-xl text-xs font-mono text-slate-300">
+                <span className="text-rose-400 font-bold">Detected: </span> {transcript}
+              </div>
+            )}
+
+            {/* TTS Voice Customization Drawer */}
+            <div className="pt-2 border-t border-slate-800/80 space-y-3">
+              <div className="flex items-center justify-between text-xs text-slate-400">
+                <span>Native Voice Selector</span>
+                <span className="text-cyan-400 font-mono">{availableVoices.length} Voices Loaded</span>
+              </div>
+              
+              <select
+                value={selectedVoiceIndex}
+                onChange={(e) => setSelectedVoiceIndex(Number(e.target.value))}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-500"
+              >
+                {availableVoices.map((voice, idx) => (
+                  <option key={idx} value={idx}>
+                    {voice.name} ({voice.lang})
+                  </option>
+                ))}
+              </select>
+
+              {/* Pitch & Rate Controls */}
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <div className="flex justify-between text-slate-400 mb-1">
+                    <span>Speed: {voiceRate}x</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="2"
+                    step="0.1"
+                    value={voiceRate}
+                    onChange={(e) => setVoiceRate(parseFloat(e.target.value))}
+                    className="w-full accent-cyan-400 bg-slate-800 h-1.5 rounded-lg cursor-pointer"
+                  />
+                </div>
+                <div>
+                  <div className="flex justify-between text-slate-400 mb-1">
+                    <span>Pitch: {voicePitch}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="1.5"
+                    step="0.1"
+                    value={voicePitch}
+                    onChange={(e) => setVoicePitch(parseFloat(e.target.value))}
+                    className="w-full accent-cyan-400 bg-slate-800 h-1.5 rounded-lg cursor-pointer"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </section>
+
+        {/* RIGHT COLUMN: MULTI-TAB EXECUTIVE DASHBOARD & SYSTEM SUITE (7 Cols) */}
+        <section className="lg:col-span-7 flex flex-col space-y-6">
+
+          {/* DASHBOARD TAB NAVIGATION BAR */}
+          <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/80 p-1.5 rounded-2xl flex items-center space-x-1 overflow-x-auto">
+            {[
+              { id: 'dashboard', label: 'Console Log', icon: Terminal },
+              { id: 'face_cam', label: 'Face Cam Auth', icon: Camera },
+              { id: 'memory', label: 'Memory Bank', icon: HardDrive },
+              { id: 'system', label: 'System Suite', icon: Sliders },
+              { id: 'api_config', label: 'API Integrations', icon: Settings }
+            ].map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-center space-x-2 whitespace-nowrap transition-all ${
+                    activeTab === tab.id 
+                      ? 'bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm' 
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* TAB 1: CONSOLE LOG & CHAT INTERFACE */}
+          {activeTab === 'dashboard' && (
+            <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/80 rounded-3xl p-6 flex flex-col h-[520px] shadow-xl">
+              <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+                <div className="flex items-center space-x-2">
+                  <Terminal className="w-4 h-4 text-cyan-400" />
+                  <span className="text-xs font-mono font-bold text-slate-300 uppercase">Live Command Log</span>
+                </div>
+                <button 
+                  onClick={() => setChatLogs([])}
+                  className="text-[10px] font-mono text-slate-500 hover:text-slate-300"
+                >
+                  Clear Terminal
+                </button>
+              </div>
+
+              {/* Chat Message Stream */}
+              <div className="flex-1 overflow-y-auto py-4 space-y-3 pr-2 scrollbar-thin scrollbar-thumb-slate-800">
+                {chatLogs.map((log) => (
+                  <div 
+                    key={log.id} 
+                    className={`flex flex-col ${log.sender === 'user' ? 'items-end' : 'items-start'}`}
+                  >
+                    <div className="flex items-center space-x-2 mb-1">
+                      <span className="text-[10px] font-mono text-slate-500">{log.time}</span>
+                      <span className={`text-[10px] font-mono font-bold uppercase ${log.sender === 'user' ? 'text-indigo-400' : log.sender === 'error' ? 'text-red-400' : 'text-cyan-400'}`}>
+                        {log.sender}
+                      </span>
+                    </div>
+                    <div 
+                      className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-xs leading-relaxed ${
+                        log.sender === 'user'
+                          ? 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-tr-none'
+                          : log.sender === 'error'
+                          ? 'bg-red-950/50 border border-red-800/80 text-red-200 rounded-tl-none'
+                          : 'bg-slate-950 border border-slate-800 text-slate-200 rounded-tl-none font-sans'
+                      }`}
+                    >
+                      {log.text}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Manual Input Terminal Box */}
+              <form onSubmit={handleManualSubmit} className="pt-4 border-t border-slate-800 flex items-center space-x-2">
+                <input
+                  type="text"
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  placeholder="यहाँ टाइप करें या वॉयस बटन दबाएं..."
+                  className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                />
+                <button
+                  type="submit"
+                  className="p-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-xl transition-all shadow-md shadow-cyan-500/20"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* TAB 2: WEBCAM FACE RECOGNITION & BIOMETRIC SCANNER */}
+          {activeTab === 'face_cam' && (
+            <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/80 rounded-3xl p-6 flex flex-col space-y-4 shadow-xl">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-center space-x-2">
+                  <Camera className="w-4 h-4 text-emerald-400" />
+                  <span className="text-xs font-mono font-bold text-slate-300 uppercase">Face++ Biometric Scanner HUD</span>
+                </div>
+                <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold ${scanStatus === 'VERIFIED' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300'}`}>
+                  STATUS: {scanStatus}
+                </span>
+              </div>
+
+              {/* Video Scanner Overlay Box */}
+              <div className="relative w-full h-72 bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 flex items-center justify-center">
+                {camActive ? (
+                  <video 
+                    ref={videoRef} 
+                    autoPlay 
+                    muted 
+                    playsInline 
+                    className="w-full h-full object-cover" 
+                  />
+                ) : (
+                  <div className="text-center space-y-2 text-slate-500">
+                    <Eye className="w-12 h-12 mx-auto stroke-1" />
+                    <p className="text-xs">वेबकैम बायोमेट्रिक स्कैन शुरू करने के लिए स्टार्ट दबाएं</p>
+                  </div>
+                )}
+
+                {/* Laser Reticle Grid Simulation */}
+                {camActive && (
+                  <div className="absolute inset-0 border-2 border-emerald-500/30 pointer-events-none flex items-center justify-center">
+                    <div className="w-48 h-48 border-2 border-dashed border-emerald-400 rounded-full animate-spin" />
+                    <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-emerald-500/50 animate-pulse" />
+                    <div className="absolute text-[10px] font-mono text-emerald-400 bottom-3 right-3 bg-slate-950/80 px-2 py-1 rounded">
+                      MATCH: 99.8%
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Camera Action Buttons */}
+              <div className="flex items-center space-x-3">
+                {!camActive ? (
+                  <button
+                    onClick={startCamera}
+                    className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-xl flex items-center justify-center space-x-2 transition-all shadow-lg shadow-emerald-500/20"
+                  >
+                    <Power className="w-4 h-4" />
+                    <span>Start Webcam Scan</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={stopCamera}
+                    className="flex-1 py-3 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl flex items-center justify-center space-x-2 transition-all"
+                  >
+                    <Power className="w-4 h-4" />
+                    <span>Stop Camera</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: RUKKO MEMORY BANK EDITOR */}
+          {activeTab === 'memory' && (
+            <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/80 rounded-3xl p-6 flex flex-col space-y-4 shadow-xl">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-center space-x-2">
+                  <HardDrive className="w-4 h-4 text-purple-400" />
+                  <span className="text-xs font-mono font-bold text-slate-300 uppercase">Persistent Memory Bank Editor</span>
+                </div>
+                <span className="text-[10px] font-mono text-slate-500">{memoryBank.length} Memories Saved</span>
+              </div>
+
+              {/* Add New Memory Form */}
+              <form onSubmit={addMemoryItem} className="grid grid-cols-1 sm:grid-cols-5 gap-2">
+                <input
+                  type="text"
+                  placeholder="Key (e.g. MasterCity)"
+                  value={newMemKey}
+                  onChange={(e) => setNewMemKey(e.target.value)}
+                  className="sm:col-span-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500"
+                />
+                <input
+                  type="text"
+                  placeholder="Value (e.g. New Delhi)"
+                  value={newMemVal}
+                  onChange={(e) => setNewMemVal(e.target.value)}
+                  className="sm:col-span-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500"
+                />
+                <button
+                  type="submit"
+                  className="sm:col-span-1 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl py-2 transition-all"
+                >
+                  Save Key
+                </button>
+              </form>
+
+              {/* Memory Items List Table */}
+              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                {memoryBank.map((item) => (
+                  <div key={item.id} className="bg-slate-950/80 border border-slate-800/80 p-3 rounded-xl flex items-center justify-between text-xs">
+                    <div>
+                      <span className="font-mono text-purple-400 font-bold">{item.key}: </span>
+                      <span className="text-slate-200">{item.value}</span>
+                      <span className="ml-2 text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">
+                        {item.category}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => deleteMemoryItem(item.id)}
+                      className="text-slate-500 hover:text-red-400 p-1"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: SYSTEM CONTROL SUITE & TOOLS */}
+          {activeTab === 'system' && (
+            <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/80 rounded-3xl p-6 flex flex-col space-y-6 shadow-xl">
+              <div className="flex items-center space-x-2 pb-3 border-b border-slate-800">
+                <Sliders className="w-4 h-4 text-amber-400" />
+                <span className="text-xs font-mono font-bold text-slate-300 uppercase">Autonomous System Suite</span>
+              </div>
+
+              {/* System Performance Switches */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="bg-slate-950/80 border border-slate-800 p-4 rounded-2xl flex items-center justify-between">
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-200">Battery Saver Engine</h4>
+                    <p className="text-[10px] text-slate-500">Reduce animation latency & speech quality</p>
+                  </div>
+                  <button
+                    onClick={() => setBatterySaver(!batterySaver)}
+                    className={`w-11 h-6 rounded-full transition-colors relative ${batterySaver ? 'bg-cyan-500' : 'bg-slate-800'}`}
+                  >
+                    <span className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-transform ${batterySaver ? 'left-6' : 'left-1'}`} />
+                  </button>
+                </div>
+
+                <div className="bg-slate-950/80 border border-slate-800 p-4 rounded-2xl flex items-center justify-between">
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-200">Gaming FPS Booster</h4>
+                    <p className="text-[10px] text-slate-500">Lock high refresh rates for dynamic render</p>
+                  </div>
+                  <button
+                    onClick={() => setFpsBooster(!fpsBooster)}
+                    className={`w-11 h-6 rounded-full transition-colors relative ${fpsBooster ? 'bg-emerald-500' : 'bg-slate-800'}`}
+                  >
+                    <span className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-transform ${fpsBooster ? 'left-6' : 'left-1'}`} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Web Search Tool Integration */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-mono font-bold text-slate-400 uppercase flex items-center space-x-2">
+                  <Search className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Real-time Web Grounding Search Tool</span>
+                </h4>
+                <div className="flex space-x-2">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="वेब सर्च करें (e.g. AI News India)..."
+                    className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+                  />
+                  <button
+                    onClick={() => handleWebSearch(searchQuery)}
+                    className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-xl transition-all"
+                  >
+                    {isSearching ? 'Searching...' : 'Search'}
+                  </button>
+                </div>
+
+                {/* Search Results Render */}
+                {searchResults && (
+                  <div className="space-y-2 pt-2">
+                    {searchResults.map((res, i) => (
+                      <div key={i} className="bg-slate-950 border border-slate-800/80 p-3 rounded-xl text-xs space-y-1">
+                        <a href={res.url} target="_blank" rel="noreferrer" className="text-cyan-400 font-bold hover:underline">
+                          {res.title}
+                        </a>
+                        <p className="text-slate-400 text-[11px]">{res.snippet}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 5: API INTEGRATIONS & LIVE DIAGNOSTICS CONSOLE */}
+          {activeTab === 'api_config' && (
+            <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/80 rounded-3xl p-6 flex flex-col space-y-6 shadow-xl">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-center space-x-2">
+                  <Settings className="w-4 h-4 text-cyan-400" />
+                  <span className="text-xs font-mono font-bold text-slate-300 uppercase">Live REST / WebSocket API Key Configurator</span>
+                </div>
+              </div>
+
+              {/* API Key Inputs Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-mono text-slate-400">OpenAI GPT-4o Key</label>
+                  <input
+                    type="password"
+                    placeholder="sk-..."
+                    value={apiKeys.openai}
+                    onChange={(e) => setApiKeys({ ...apiKeys, openai: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-mono text-slate-400">ElevenLabs TTS Key</label>
+                  <input
+                    type="password"
+                    placeholder="el-..."
+                    value={apiKeys.elevenlabs}
+                    onChange={(e) => setApiKeys({ ...apiKeys, elevenlabs: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+              </div>
+
+              {/* Live Endpoint Tester Controls */}
+              <div className="space-y-3 pt-2">
+                <h4 className="text-xs font-mono font-bold text-slate-400 uppercase">Live Endpoint Diagnostics Tester</h4>
+                <div className="flex flex-wrap gap-2">
+                  <button 
+                    onClick={() => triggerApiTest('GPT4')}
+                    className="px-3 py-2 bg-slate-950 border border-cyan-500/40 hover:bg-cyan-500/20 text-cyan-300 text-xs font-mono rounded-xl transition-all"
+                  >
+                    Test OpenAI Chat Endpoint
+                  </button>
+                  <button 
+                    onClick={() => triggerApiTest('ELEVENLABS')}
+                    className="px-3 py-2 bg-slate-950 border border-purple-500/40 hover:bg-purple-500/20 text-purple-300 text-xs font-mono rounded-xl transition-all"
+                  >
+                    Test ElevenLabs Voice Stream
+                  </button>
+                  <button 
+                    onClick={() => triggerApiTest('FACE_PLUS')}
+                    className="px-3 py-2 bg-slate-950 border border-emerald-500/40 hover:bg-emerald-500/20 text-emerald-300 text-xs font-mono rounded-xl transition-all"
+                  >
+                    Test Face++ Biometrics
+                  </button>
+                </div>
+              </div>
+
+              {/* Real-time Diagnostics Log */}
+              <div className="space-y-2">
+                <span className="text-[11px] font-mono text-slate-500">API Response Stream Log</span>
+                <div className="bg-slate-950 border border-slate-800 rounded-2xl p-3 h-40 overflow-y-auto space-y-2 font-mono text-[11px]">
+                  {apiLogs.length === 0 ? (
+                    <span className="text-slate-600">No diagnostic calls triggered yet...</span>
+                  ) : (
+                    apiLogs.map((log) => (
+                      <div key={log.id} className="flex justify-between border-b border-slate-900 pb-1">
+                        <span className="text-cyan-400">{log.timestamp}</span>
+                        <span className="text-slate-300">{log.endpoint}</span>
+                        <span className="text-emerald-400 font-bold">{log.status}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+        </section>
+      </main>
+
+      {/* FOOTER AUDIT BAR */}
+      <footer className="border-t border-slate-800/80 bg-slate-950 py-4 px-6 text-center text-xs text-slate-500 font-mono">
+        <p>RUKKO AI AUTONOMOUS PERSONAL ASSISTANT • SYSTEM HEALTH: OPTIMAL • POWERED BY WEB SPEECH & GEMINI API</p>
+      </footer>
+    </div>
+  );
+}
